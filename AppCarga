@@ -1,0 +1,312 @@
+    Dim nivelActual As Integer
+    Dim nextCol As Integer
+    Dim nextRow As Integer
+    Dim maxCol  As Integer
+    Dim lineArray() As String
+    Dim indOccurs As String
+    Dim ruta As String
+    Dim modulo As String
+    Dim moduloA As String
+    Dim wkSheet As String
+    Dim propertiesRow As Integer
+    Dim propertiesCol As Integer
+    Dim occursName As String
+    
+    
+    
+Sub init(tipo)
+    'ruta = "C:\Users\0014879\Desktop\Proyecto Auto\"
+    'rutaTemp = "C:\Users\0014879\Desktop\Proyecto Auto\Temporal\"
+    ruta = "M:\MF\COBOL\DESEN\MACCOB\"
+    rutaTemp = "C:\PruebasUnitarias\Temporal\"
+    indOccurs = "N"
+    
+    Range("C4") = UCase(Range("C4"))
+    'modulo = Left(Range("C4"), 7)
+    modulo = Range("C4")
+    
+    Range("C8") = UCase(Range("C8"))
+    'moduloA = Left(Range("C8"), 7)
+    moduloA = Range("C8")
+    
+    If tipo = "C" Then
+        Worksheets.Add(After:=Worksheets(Worksheets.Count)).Name = "properties"
+        Sheets("Inicio").Select
+    End If
+    
+End Sub
+    
+Sub ProcesoCargaCopy()
+'Proceso principal que se encarga de realizar la carga de la copy a la hoja excel
+    eliminarHojas
+    init ("C")
+    
+    If existeArchivo(modulo) = False Then
+        MsgBox ("No se ha encontrado la copy del módulo en " & ruta)
+        GoTo fin
+    End If
+    
+    moverCopyALocal (modulo)
+    importarTXT (modulo)
+    cargaCasos
+    formatoTabla
+    setCopy (modulo)
+    Sheets("properties").Visible = False
+    Sheets("Inicio").Select
+    eliminarCopyTemporal (modulo)
+    
+fin:
+End Sub
+Sub ProcesoCargaCopyAdicional()
+    init ("A")
+'Proceso que se encarga de realizar la carga de copys adicionales a la hoja excel
+
+    If existeArchivo(moduloA) = False Then
+        MsgBox ("No se ha encontrado la copy del módulo en " & ruta)
+        GoTo fin
+    End If
+    
+    moverCopyALocal (moduloA)
+    importarTXT (moduloA)
+    cargaCasos
+    formatoTabla
+    setCopy (moduloA)
+    Sheets("properties").Visible = False
+    Sheets("Inicio").Select
+    eliminarCopyTemporal (moduloA)
+    
+fin:
+End Sub
+
+    
+Sub importarTXT(modulo)
+'Se encarga de leer línea a línea la copy, para su posterior tratado
+    Dim Archivo As String, Origen As Long, Arreglo As String
+        
+    Archivo = rutaTemp & modulo & ".CPY"
+    
+    Origen = FreeFile
+    Open Archivo For Input As #Origen
+    Application.ScreenUpdating = False
+    On Error Resume Next
+    Do While Seek(Origen) <= LOF(Origen)
+      Line Input #Origen, Arreglo
+      tratarLinea (Arreglo)
+    Loop
+    Close #Origen
+    
+    ajustarColumnas
+    
+End Sub
+Public Function existeArchivo(modulo) As Boolean
+' Comprueba si existe la copy en la ruta a buscar: M:\MF\COBOL\DESEN\MACCOB
+    Dim Archivo As String
+    Archivo = ruta & modulo & ".CPY"
+    
+    If Len(Dir(Archivo)) = 0 Then
+        existeArchivo = False
+    Else
+        existeArchivo = True
+    End If
+    
+End Function
+Sub tratarLinea(linea)
+' Recibe la línea de la copy y escribe en su hoja correspondiente las variables
+
+    linea = Mid(linea, 7, 66)
+    If InStr(1, linea, "*") <> 1 Then
+        linea = WorksheetFunction.Trim(linea)
+        lineArray() = Split(linea)
+
+        If lineArray(0) = "01" Then
+            If ActiveSheet.Name <> "Inicio" Then
+                ajustarColumnas
+                cargaCasos
+                formatoTabla
+            End If
+                       
+            createSheet
+            
+            If InStr(1, lineArray(0), "0") = 1 Then
+                nivelActual = CInt(Replace(lineArray(0), "0", ""))
+            Else
+                nivelActual = CInt(lineArray(0))
+            End If
+            
+            setKeyProperties ("S")
+            indOccurs = "N"
+            occursName = ""
+        Else
+            Dim nivel As Integer
+
+            If InStr(1, lineArray(0), "0") = 1 Then
+                nivel = CInt(Replace(lineArray(0), "0", ""))
+            Else
+                nivel = CInt(lineArray(0))
+            End If
+            
+            If nivel > nivelActual Then
+                nextCol = nextCol + 1
+            ElseIf nivel = nivelActual Then
+                nextRow = nextRow + 1
+            Else
+                nextCol = nextCol - 1
+                nextRow = nextRow + 1
+                indOccurs = "N"
+                occursName = ""
+            End If
+            
+            If nextCol > maxCol Then
+                maxCol = nextCol
+            End If
+            
+            nivelActual = nivel
+
+            If lineArray(2) = "OCCURS" Then
+                Cells(nextRow, nextCol) = lineArray(1) & " Occurs | " & lineArray(3)
+                indOccurs = "S"
+                occursName = lineArray(1)
+            Else
+                Cells(nextRow, nextCol) = lineArray(1)
+                setKeyProperties ("N")
+            End If
+        End If
+        
+    End If
+    
+End Sub
+Sub setKeyProperties(indNewArea)
+    wkSheet = ActiveSheet.Name
+    Sheets("properties").Select
+    If indNewArea = "S" Then
+        For i = 3 To 100 Step 2
+            If IsEmpty(Cells(1, i)) Then
+                Cells(1, i) = wkSheet
+                propertiesRow = 2
+                propertiesCol = i
+                Exit For
+            End If
+        Next i
+    Else
+        Cells(propertiesRow, propertiesCol) = nextRow
+        If lineArray(2) = "OCCURS" Then
+            Cells(propertiesRow, propertiesCol + 1) = lineArray(1)
+        Else
+            If indOccurs = "S" Then
+                Cells(propertiesRow, propertiesCol + 1) = "|" & lineArray(1) & " OF " & occursName
+            Else
+                Cells(propertiesRow, propertiesCol + 1) = lineArray(1)
+            End If
+        End If
+        propertiesRow = propertiesRow + 1
+    End If
+    Sheets(wkSheet).Select
+End Sub
+Sub eliminarHojas()
+' Elimina las hojas de las copys de módulos anteriores
+    Dim ws As Worksheet
+    For Each ws In ThisWorkbook.Worksheets
+        If ws.Name <> "Inicio" Then
+            Application.DisplayAlerts = False
+            ws.Delete
+            Application.DisplayAlerts = True
+        End If
+    Next ws
+End Sub
+
+Sub ajustarColumnas()
+' Ajusta el tamaño de las columnas para que se vea el nombre completo
+    For i = 1 To maxCol
+        Columns(i).EntireColumn.AutoFit
+    Next i
+End Sub
+
+Sub cargaCasos()
+' Carga los casos de pruebas
+    For i = 1 To 10
+        Cells(1, i + maxCol) = "Prueba " & i
+    Next i
+    maxCol = maxCol + 10
+End Sub
+
+Sub formatoTabla()
+' Da formato tabla a las celdas de la copy
+    Range(Cells(1, 1), Cells(nextRow, maxCol)).Select
+    With Selection.Interior
+        .Pattern = xlNone
+        .TintAndShade = 0
+        .PatternTintAndShade = 0
+    End With
+    Range(Cells(1, 1), Cells(nextRow, maxCol)).Select
+    Selection.NumberFormat = "@"
+    
+    ActiveSheet.ListObjects.Add(xlSrcRange, Range(Cells(1, 1), Cells(nextRow, maxCol)), , xlNo).Name = "Tabla"
+    ActiveSheet.ListObjects("Tabla").TableStyle = "TableStyleMedium14"
+    ActiveSheet.ListObjects("Tabla").ShowHeaders = False
+    
+    Rows("1:1").Select
+    With Selection.Interior
+        .Pattern = xlSolid
+        .PatternColorIndex = xlAutomatic
+        .ThemeColor = xlThemeColorAccent6
+        .TintAndShade = -0.499984740745262
+        .PatternTintAndShade = 0
+    End With
+    Selection.EntireRow.Hidden = True
+    Range("A1").Select
+    ActiveCell.FormulaR1C1 = maxCol
+    Range("B1").Select
+    ActiveCell.FormulaR1C1 = nextRow
+    Range("A1:B1").Select
+    With Selection.Font
+        .ThemeColor = xlThemeColorAccent6
+        .TintAndShade = -0.499984740745262
+    End With
+    
+    Range("A1").Select
+    
+    
+End Sub
+
+Sub createSheet()
+' Crea una nueva hoja, y le da el color principal
+    Worksheets.Add(After:=Worksheets(Worksheets.Count)).Name = lineArray(1)
+    Sheets(lineArray(1)).Select
+    Cells.Select
+    With Selection.Interior
+        .Pattern = xlSolid
+        .PatternColorIndex = xlAutomatic
+        .ThemeColor = xlThemeColorAccent6
+        .TintAndShade = -0.499984740745262
+        .PatternTintAndShade = 0
+    End With
+    nextCol = 0
+    nextRow = 2
+    maxCol = 0
+End Sub
+
+Sub moverCopyALocal(modulo)
+'Mueve la copy a local para así trabajar con una copia y no la original
+    Dim oldDirectorio As String
+    Dim newDirectorio As String
+    
+    oldDirectorio = ruta & modulo & ".CPY"
+    newDirectorio = rutaTemp & modulo & ".CPY"
+    
+    FileCopy oldDirectorio, newDirectorio
+    
+End Sub
+
+Sub eliminarCopyTemporal(modulo)
+    Kill (rutaTemp & modulo & ".CPY")
+End Sub
+Sub setCopy(modulo)
+    Sheets("properties").Select
+    Range("A1").Activate
+    Cells.find(What:="", After:=ActiveCell, LookIn:=xlFormulas, LookAt:= _
+    xlWhole, SearchOrder:=xlByColumns, SearchDirection:=xlNext, MatchCase:= _
+    False, SearchFormat:=False).Activate
+    ActiveCell = "copy"
+    Cells(ActiveCell.Row, ActiveCell.Column + 1) = modulo
+End Sub
+
