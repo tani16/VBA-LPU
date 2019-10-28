@@ -1,0 +1,109 @@
+Dim ruta As String
+Dim doc
+
+Sub Proceso()
+    init
+    createRawTxt
+    setProperties
+    readExcel
+    closeRawTxt
+    Sheets("properties").Visible = False
+    Sheets("Inicio").Select
+    cargarDatosEnLanzador
+End Sub
+Sub init()
+    Sheets("properties").Visible = True
+    ruta = "C:\PruebasUnitarias\Temporal\rawData.txt"
+End Sub
+Sub createRawTxt()
+    Set fs = CreateObject("Scripting.FileSystemObject")
+    Set doc = fs.CreateTextFile(ruta, True)
+End Sub
+Sub setProperties()
+    Sheets("Inicio").Select
+    writeInDoc ("Modulo-" & Range("C4"))
+    
+    If Range("C5") = "Desarrollo" Then
+        writeInDoc ("Entorno-DESA")
+    Else
+        writeInDoc ("Entorno-PRE")
+    End If
+    
+    writeInDoc ("Rollback-" & Range("C6"))
+    
+    Sheets("properties").Select
+    For Row = 1 To 100
+        If IsEmpty(Cells(Row, 1)) Then
+            Exit For
+        End If
+        writeInDoc ("Copy-" & Cells(Row, 2))
+    Next Row
+    
+End Sub
+Sub readExcel()
+    For hoja = 3 To Sheets.Count
+        indOccurs = 1
+        Sheets(hoja).Select
+        maxCol = Range("A1")
+        maxRow = Range("B1")
+        Range("A2").Select
+        Selection.End(xlToRight).Select
+        wRow = ActiveCell.Row
+        wCol = ActiveCell.Column
+        writeInDoc ("----- Next Area: " & ActiveSheet.Name & " -----")
+        
+        For columna = wCol To maxCol
+            If Cells(2, columna) Like "Prueba*" Then
+                nTest = columna - wCol + 1
+                writeInDoc ("--- Prueba " & nTest & " ---")
+                indOccurs = 1
+            Else
+                indOccurs = indOccurs + 1
+            End If
+            
+            For fila = wRow + 1 To maxRow
+                If Not IsEmpty(Cells(fila, columna)) Then
+                    valor = Cells(fila, columna)
+                    Key = takeKey(fila - 1)
+
+                    If Key Like "|*" Then
+                        Key = Replace(Key, "|", "")
+                        writeInDoc (Key & "(" & indOccurs & ")" & "---" & valor)
+                    Else
+                        writeInDoc (Key & "---" & valor)
+                        indOccurs = 1
+                    End If
+                End If
+            Next fila
+        Next columna
+        
+    Next hoja
+End Sub
+Sub writeInDoc(linea)
+    doc.writeLine (linea)
+End Sub
+Function takeKey(fila) As String
+    wkSheet = ActiveSheet.Name
+    Sheets("properties").Select
+    Range("A1").Select
+    Cells.find(What:=wkSheet, After:=ActiveCell, LookIn:=xlFormulas, LookAt _
+        :=xlWhole, SearchOrder:=xlByRows, SearchDirection:=xlNext, MatchCase:= _
+        False, SearchFormat:=False).Activate
+        
+    Cells.find(What:=fila, After:=ActiveCell, LookIn:=xlFormulas, LookAt _
+        :=xlWhole, SearchOrder:=xlByColumns, SearchDirection:=xlNext, MatchCase:= _
+        False, SearchFormat:=False).Activate
+       
+    takeKey = Cells(ActiveCell.Row, ActiveCell.Column + 1)
+    Sheets(wkSheet).Select
+    
+End Function
+Sub closeRawTxt()
+    doc.Close
+End Sub
+
+Sub cargarDatosEnLanzador()
+    Application.DisplayAlerts = False
+    ActiveWorkbook.FollowHyperlink Address:="C:\PruebasUnitarias\Temporal\AppLoadLPU.jar", NewWindow:=True
+    Application.DisplayAlerts = True
+End Sub
