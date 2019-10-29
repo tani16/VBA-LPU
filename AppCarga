@@ -1,10 +1,11 @@
-    Dim nivelActual As Integer
+     Dim nivelActual As Integer
     Dim nextCol As Integer
     Dim nextRow As Integer
     Dim maxCol  As Integer
     Dim lineArray() As String
     Dim indOccurs As String
     Dim ruta As String
+    Dim rutaLocal As String
     Dim modulo As String
     Dim moduloA As String
     Dim wkSheet As String
@@ -19,6 +20,7 @@ Sub init(tipo)
     'rutaTemp = "C:\Users\0014879\Desktop\Proyecto Auto\Temporal\"
     ruta = "M:\MF\COBOL\DESEN\MACCOB\"
     rutaTemp = "C:\PruebasUnitarias\Temporal\"
+    rutaLocal = "C:\COBOL\MACCOB\"
     indOccurs = "N"
     
     Range("C4") = UCase(Range("C4"))
@@ -32,6 +34,8 @@ Sub init(tipo)
     If tipo = "C" Then
         Worksheets.Add(After:=Worksheets(Worksheets.Count)).Name = "properties"
         Sheets("Inicio").Select
+    Else
+        Sheets("properties").Visible = True
     End If
     
 End Sub
@@ -42,7 +46,7 @@ Sub ProcesoCargaCopy()
     init ("C")
     
     If existeArchivo(modulo) = False Then
-        MsgBox ("No se ha encontrado la copy del módulo en " & ruta)
+        MsgBox ("No se ha encontrado la copy del módulo")
         GoTo fin
     End If
     
@@ -62,7 +66,7 @@ Sub ProcesoCargaCopyAdicional()
 'Proceso que se encarga de realizar la carga de copys adicionales a la hoja excel
 
     If existeArchivo(moduloA) = False Then
-        MsgBox ("No se ha encontrado la copy del módulo en " & ruta)
+        MsgBox ("No se ha encontrado la copy del módulo")
         GoTo fin
     End If
     
@@ -102,13 +106,19 @@ Public Function existeArchivo(modulo) As Boolean
 ' Comprueba si existe la copy en la ruta a buscar: M:\MF\COBOL\DESEN\MACCOB
     Dim Archivo As String
     Archivo = ruta & modulo & ".CPY"
-    
-    If Len(Dir(Archivo)) = 0 Then
-        existeArchivo = False
-    Else
+    ArchivoLocal = rutaLocal & modulo & ".CPY"
+
+
+    If Len(Dir(Archivo)) <> 0 Then
         existeArchivo = True
+    Else
+        If Len(Dir(ArchivoLocal)) <> 0 Then
+        existeArchivo = True
+        Else
+        existeArchivo = False
+        End If
     End If
-    
+
 End Function
 Sub tratarLinea(linea)
 ' Recibe la línea de la copy y escribe en su hoja correspondiente las variables
@@ -290,7 +300,13 @@ Sub moverCopyALocal(modulo)
     Dim oldDirectorio As String
     Dim newDirectorio As String
     
-    oldDirectorio = ruta & modulo & ".CPY"
+    If Len(Dir(ruta & modulo & ".CPY")) <> 0 Then
+        oldDirectorio = ruta & modulo & ".CPY"
+    Else
+        oldDirectorio = rutaLocal & modulo & ".CPY"
+    End If
+    
+    
     newDirectorio = rutaTemp & modulo & ".CPY"
     
     FileCopy oldDirectorio, newDirectorio
@@ -309,4 +325,5 @@ Sub setCopy(modulo)
     ActiveCell = "copy"
     Cells(ActiveCell.Row, ActiveCell.Column + 1) = modulo
 End Sub
+
 
